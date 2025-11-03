@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GEMINI_API_KEY } from '../../config';
+import { getDeviceInfo } from '../utils/deviceInfo';
 
 // Initialize Gemini API
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -70,20 +71,33 @@ Requirements:
 - Do NOT include the solution or answer
 - Make it interesting and practical
 - Vary the difficulty within Class ${classNum} range
+- CRITICAL: Use ONLY calculation-friendly values:
+  * Use whole numbers (integers) only - NO decimals
+  * Use simple fractions only if necessary (e.g., 1/2, 1/4, 3/4)
+  * Avoid complex decimals like 3.14159... use approximations like 3.14 or 22/7 when needed
+  * Choose numbers that result in whole number answers or simple fractional answers
+  * Avoid numbers that lead to long decimal answers
 
 Examples of question styles (but create your own with different numbers):
-- Linear equations: "Solve for x: [random]x + [random] = [random]"
-- Geometry: "Find the area of a [shape] with [dimensions]"
-- Word problems: "If [quantity] items cost ₹[amount], what is the cost of [different quantity] items?"
-- Percentages: "[random]% of [number] is what number?"
+- Linear equations: "Solve for x: [random whole number]x + [random whole number] = [random whole number]"
+- Geometry: "Find the area of a [shape] with [whole number dimensions]"
+- Word problems: "If [whole number quantity] items cost ₹[whole number amount], what is the cost of [different whole number quantity] items?"
+- Percentages: "[round percentage number]% of [whole number] is what number?"
 
-Generate ONE NEW UNIQUE question NOW:`;
+Generate ONE NEW UNIQUE question NOW (using only whole numbers and calculation-friendly values):`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const question = response.text().trim();
 
-    console.log('Generated question:', question);
+    // Log device information
+    const deviceInfo = await getDeviceInfo();
+    console.log('=== Question Generated ===');
+    console.log('Device:', deviceInfo);
+    console.log('Subject:', subject, 'Class:', classNum);
+    console.log('Question:', question);
+    console.log('========================');
+
     return question;
   } catch (error) {
     console.error('Error generating question:', error);
@@ -157,7 +171,13 @@ Generate a contextual hint based on their current work:`;
       const response = await result.response;
       const hint = response.text().trim();
       
-      console.log('Generated contextual hint:', hint);
+      // Log device information
+      const deviceInfo = await getDeviceInfo();
+      console.log('=== Hint Generated (Contextual) ===');
+      console.log('Device:', deviceInfo);
+      console.log('Hint:', hint);
+      console.log('==================================');
+      
       return cleanMarkdown(hint);
     } else {
       // No canvas content - provide general hint
@@ -178,7 +198,13 @@ Generate a helpful hint to get them started:`;
       const response = await result.response;
       const hint = response.text().trim();
       
-      console.log('Generated general hint:', hint);
+      // Log device information
+      const deviceInfo = await getDeviceInfo();
+      console.log('=== Hint Generated (General) ===');
+      console.log('Device:', deviceInfo);
+      console.log('Hint:', hint);
+      console.log('================================');
+      
       return cleanMarkdown(hint);
     }
   } catch (error) {
@@ -210,14 +236,23 @@ ${question}
 
 INSTRUCTIONS:
 1. First, describe what you see in the image - what numbers, equations, or working did the student write?
-2. Analyze if the student's written answer matches the correct solution
-3. Check their working and methodology
-4. Determine if the answer is CORRECT or INCORRECT based on what they actually wrote
+2. Extract the numerical answer from the student's work
+3. Calculate or identify the correct numerical answer to the question
+4. Compare the student's answer with the correct answer using TOLERANCE:
+   - If the student's answer is within 0.5 of the correct answer (or within 1% if dealing with larger numbers), consider it CORRECT
+   - Example: If correct answer is 1932.3 and student wrote 1932, that's CORRECT (difference is 0.3, which is less than 0.5)
+   - Example: If correct answer is 100 and student wrote 99 or 101, that's CORRECT
+   - Example: If correct answer is 50 and student wrote 48 or 52, that's CORRECT (within 1% of 50)
+   - Rounding differences and minor calculation errors should be accepted if they're very close
+5. Check their working and methodology - even if the final number has a small error, praise correct methodology
+6. Determine if the answer is CORRECT or INCORRECT based on:
+   - Numerical closeness (within tolerance)
+   - AND correct methodology/working
 
 Your response MUST be in this exact JSON format:
 {
   "isCorrect": true,
-  "feedback": "Start by describing what you see in the image, then provide detailed analysis of their solution",
+  "feedback": "Start by describing what you see in the image, then provide detailed analysis of their solution. If the answer is very close (within 0.5 or 1%), acknowledge it as correct and praise their work. If incorrect, provide helpful guidance.",
   "correctAnswer": "The correct answer and solution steps"
 }
 
@@ -231,6 +266,11 @@ CRITICAL JSON FORMATTING RULES:
 - Use "x" for multiplication, "/" for division
 - Do NOT include special control characters
 
+CRITICAL TOLERANCE RULE:
+- Accept answers that are very close to the correct answer (within 0.5 for smaller numbers, or within 1% for larger numbers)
+- If a student writes 1932 and the answer is 1932.3, mark it as CORRECT (isCorrect: true) and praise them
+- Only mark as incorrect if the answer is significantly different or if the methodology is completely wrong
+
 CRITICAL: Base your evaluation ONLY on what is actually drawn/written in the image. Do not assume or guess.
 Be honest - if the answer is wrong, say so clearly. If you cannot read the handwriting, say that too.`;
 
@@ -242,6 +282,14 @@ Be honest - if the answer is wrong, say so clearly. If you cannot read the handw
     };
 
     console.log('Sending request to Gemini AI...');
+    
+    // Log device information
+    const deviceInfo = await getDeviceInfo();
+    console.log('=== Answer Verification ===');
+    console.log('Device:', deviceInfo);
+    console.log('Question:', question.substring(0, 100) + '...');
+    console.log('==========================');
+    
     const result = await model.generateContent([prompt, imagePart]);
     const response = await result.response;
     const responseText = response.text();
