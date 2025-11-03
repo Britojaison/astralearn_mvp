@@ -9,6 +9,7 @@ const Whiteboard = forwardRef(({ paths, onPathsChange, onClear, mode = 'draw', o
   const pathsRef = useRef(paths);
   const modeRef = useRef(mode);
   const scrollViewRef = useRef(null);
+  const scrollOffsetRef = useRef({ x: 0, y: 0 }); // Track scroll offset
   const [, forceUpdate] = useState(0);
   const [scrollMode, setScrollMode] = useState(false);
   const [contentHeight, setContentHeight] = useState(SCREEN_HEIGHT * 4);
@@ -41,13 +42,16 @@ const Whiteboard = forwardRef(({ paths, onPathsChange, onClear, mode = 'draw', o
     if (scrollMode) return; // Don't draw in scroll mode
     
     const { locationX, locationY } = event.nativeEvent;
+    // Adjust coordinates for scroll offset
+    const adjustedX = locationX + scrollOffsetRef.current.x;
+    const adjustedY = locationY + scrollOffsetRef.current.y;
     const currentMode = modeRef.current;
-    console.log(`Touch START - ${Platform.OS}, mode: ${currentMode} at:`, locationX, locationY);
+    console.log(`Touch START - ${Platform.OS}, mode: ${currentMode} at:`, adjustedX, adjustedY, `(scroll offset: ${scrollOffsetRef.current.y})`);
     
     if (currentMode === 'erase') {
       // Find and remove paths near the touch point
       const remainingPaths = pathsRef.current.filter((p, index) => {
-        const isNear = isPointNearPath(locationX, locationY, p.path);
+        const isNear = isPointNearPath(adjustedX, adjustedY, p.path);
         if (isNear) {
           console.log(`Erasing path ${index}`);
         }
@@ -57,7 +61,7 @@ const Whiteboard = forwardRef(({ paths, onPathsChange, onClear, mode = 'draw', o
     } else {
       // Draw mode - create new path
       const path = Skia.Path.Make();
-      path.moveTo(locationX, locationY);
+      path.moveTo(adjustedX, adjustedY);
       currentPathRef.current = {
         path,
         color: '#000000',
@@ -71,12 +75,15 @@ const Whiteboard = forwardRef(({ paths, onPathsChange, onClear, mode = 'draw', o
     if (scrollMode) return; // Don't draw in scroll mode
     
     const { locationX, locationY } = event.nativeEvent;
+    // Adjust coordinates for scroll offset
+    const adjustedX = locationX + scrollOffsetRef.current.x;
+    const adjustedY = locationY + scrollOffsetRef.current.y;
     const currentMode = modeRef.current;
     
     if (currentMode === 'erase') {
       // Continue erasing paths as user moves
       const remainingPaths = pathsRef.current.filter((p) => {
-        return !isPointNearPath(locationX, locationY, p.path);
+        return !isPointNearPath(adjustedX, adjustedY, p.path);
       });
       if (remainingPaths.length !== pathsRef.current.length) {
         console.log(`Erasing during move`);
@@ -84,7 +91,7 @@ const Whiteboard = forwardRef(({ paths, onPathsChange, onClear, mode = 'draw', o
       }
     } else if (currentPathRef.current) {
       // Draw mode - continue drawing
-      currentPathRef.current.path.lineTo(locationX, locationY);
+      currentPathRef.current.path.lineTo(adjustedX, adjustedY);
       forceUpdate(prev => prev + 1);
     }
   };
@@ -117,15 +124,41 @@ const Whiteboard = forwardRef(({ paths, onPathsChange, onClear, mode = 'draw', o
           scrollEnabled={scrollMode}
           nestedScrollEnabled={false}
           bounces={false}
+          alwaysBounceVertical={false}
+          alwaysBounceHorizontal={false}
+          overScrollMode="never"
+          directionalLockEnabled={true}
           contentInsetAdjustmentBehavior="never"
           scrollEventThrottle={16}
+          keyboardShouldPersistTaps="handled"
+          disableIntervalMomentum={true}
           pointerEvents={scrollMode ? 'auto' : 'none'}
+          onScrollBeginDrag={() => {
+            // Ensure scroll mode is active to prevent gesture conflicts
+            if (!scrollMode) return;
+          }}
           onScroll={(e) => {
+            const x = e.nativeEvent.contentOffset.x;
             const y = e.nativeEvent.contentOffset.y;
             const viewH = e.nativeEvent.layoutMeasurement.height;
             const contentH = e.nativeEvent.contentSize.height;
-            // auto-extend near bottom for unlimited scroll
-            if (scrollMode && y + viewH > contentH - 80) {
+            
+            // Update scroll offset for touch coordinate adjustment
+            scrollOffsetRef.current = { x, y };
+            
+            // Auto-extend content much earlier to prevent reaching actual end
+            // This prevents the scroll gesture from conflicting with navigation gestures
+            if (scrollMode && y + viewH > contentH - 300) {
+              setContentHeight(prev => prev + SCREEN_HEIGHT * 2);
+            }
+          }}
+          onScrollEndDrag={(e) => {
+            const y = e.nativeEvent.contentOffset.y;
+            const viewH = e.nativeEvent.layoutMeasurement.height;
+            const contentH = e.nativeEvent.contentSize.height;
+            
+            // Extend content if user scrolled near the end
+            if (scrollMode && y + viewH > contentH - 200) {
               setContentHeight(prev => prev + SCREEN_HEIGHT * 2);
             }
           }}

@@ -33,7 +33,10 @@ export default function App() {
           <Stack.Screen
             name="Question"
             component={QuestionScreen}
-            options={{ title: 'Solve the Problem' }}
+            options={{ 
+              title: 'Solve the Problem',
+              gestureEnabled: false, // Disable swipe back gesture to prevent conflicts with whiteboard scrolling
+            }}
           />
         </Stack.Navigator>
       </NavigationContainer>

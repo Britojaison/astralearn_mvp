@@ -6,7 +6,9 @@
     "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/applogo.png",
     "splash": {
+      "image": "./assets/applogo.png",
       "resizeMode": "contain",
       "backgroundColor": "#6366f1"
     },
@@ -21,22 +23,24 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.brainleap.mvp"
+      "bundleIdentifier": "com.brainleap.mvp",
+      "icon": "./assets/applogo.png"
     },
     "android": {
+      "icon": "./assets/applogo.png",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/applogo.png",
         "backgroundColor": "#6366f1"
       },
       "package": "com.brainleap.mvp"
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./assets/applogo.png"
     },
     "extra": {
       "eas": {
-        "projectId": "brainleap-mvp"
       }
     }
   }
 }
-
